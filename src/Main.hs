@@ -73,7 +73,7 @@ main = do
     case fixtures of
       Just (Fixtures xs) ->
         -- simpleMain . hBox $ displaySizedGame <$> Prelude.take 10 xs
-        simpleMain $ customWidget "Testing..."
+        simpleMain $ customWidget xs
         -- simpleMain $
         -- Prelude.foldl
         --   (<=>)
@@ -82,19 +82,28 @@ main = do
       _ -> return ()
   return ()
 
-customWidget :: String -> Widget ()
-customWidget s =
+drawRows :: Int -> [Fixture] -> Widget ()
+drawRows columns [] = emptyWidget
+drawRows columns xs = (hBox $ displaySizedGame <$> Prelude.take columns xs) <=> (drawRows columns (Prelude.drop columns xs))
+
+customWidget :: [Fixture] -> Widget ()
+customWidget xs =
     Widget Fixed Fixed $ do
         ctx <- getContext
-        render $ str (s <> " " <> show (ctx^.availWidthL))
+        let thing = ctx ^. availWidthL `div` 60
+        render $ drawRows thing xs
 
 displaySizedGame :: Fixture -> Widget ()
-displaySizedGame f = padAll 5 $ setAvailableSize (35, 3) $ displayGame f
+displaySizedGame f = padBottom (Pad 2) $ padRight (Pad 5) $ setAvailableSize (55, 5) $ displayGame f
 
 displayGame :: Fixture -> Widget ()
 displayGame f =
   withBorderStyle unicode $
   borderWithLabel
     (str $ homeTeamName f ++ " vs. " ++ awayTeamName f)
-    (center (str (show . goalsHomeTeam . result $ f)) <+>
-     vBorder <+> center (str (show . goalsAwayTeam . result $ f)))
+    (center (str (goalsNum . goalsHomeTeam . result $ f)) <+>
+     vBorder <+> center (str (goalsNum . goalsAwayTeam . result $ f)))
+
+goalsNum :: Maybe Int -> String
+goalsNum (Just x) = show x
+goalsNum Nothing = "-"
