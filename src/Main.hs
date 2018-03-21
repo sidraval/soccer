@@ -4,17 +4,16 @@
 
 module Main where
 
-import Data.Monoid
-import Lens.Micro
 import Brick
 import Brick.Widgets.Border
 import Brick.Widgets.Border.Style
 import Brick.Widgets.Center
 import Data.Aeson
 import Data.ByteString.Lazy.Char8 as LBS
-import GHC.Generics
-import Network.HTTP
 import Data.String
+import GHC.Generics
+import Lens.Micro
+import Network.HTTP
 
 newtype Fixtures =
   Fixtures [Fixture]
@@ -71,20 +70,13 @@ main = do
   let fixtures :: Maybe Fixtures = decode $ LBS.pack responseBody
   _ <-
     case fixtures of
-      Just (Fixtures xs) ->
-        -- simpleMain . hBox $ displaySizedGame <$> Prelude.take 10 xs
-        simpleMain $ customWidget xs
-        -- simpleMain $
-        -- Prelude.foldl
-        --   (<=>)
-        --   emptyWidget 
-        --   (displayGame <$> Prelude.take 4 xs)
+      Just (Fixtures xs) -> simpleMain $ customWidget xs
       _ -> return ()
   return ()
 
 drawRows :: Int -> [Fixture] -> Widget ()
-drawRows columns [] = emptyWidget
-drawRows columns xs = (hBox $ displaySizedGame <$> Prelude.take columns xs) <=> (drawRows columns (Prelude.drop columns xs))
+drawRows _ [] = emptyWidget
+drawRows columns xs = hBox (displaySizedGame <$> Prelude.take columns xs) <=> drawRows columns (Prelude.drop columns xs)
 
 customWidget :: [Fixture] -> Widget ()
 customWidget xs =
