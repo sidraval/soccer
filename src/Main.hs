@@ -63,5 +63,5 @@ main :: IO ()
 main = do
   fixtures <- getFixtures
   void $ case fixtures of
-      Just (Fixtures xs) -> simpleMain $ resizingGrid 60 xs
+      Just (Fixtures xs) -> simpleMain $ renderForm $ mkLeagueSelection FormState { _league = Premier }
       _                  -> return ()
