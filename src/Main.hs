@@ -1,33 +1,47 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Main where
 
 import           Brick
+import           Brick.Forms
 import           Brick.Widgets.Border
 import           Brick.Widgets.Border.Style
 import           Brick.Widgets.Center
 import           Control.Monad
 import           Fixture
 import           Lens.Micro
+import           Lens.Micro.TH
 
-main :: IO ()
-main = do
-  fixtures <- getFixtures
-  void $ case fixtures of
-      Just (Fixtures xs) -> simpleMain $ customWidget xs
-      _                  -> return ()
+type Columns = Int
+type Width = Int
 
-drawRows :: Int -> [Fixture] -> Widget ()
+data League = Premier | Champions deriving (Show, Eq)
+data AppInfo = FormState  { _league :: League } deriving (Show)
+
+makeLenses ''AppInfo
+
+data Name = PremierField
+          | ChampionsField
+          deriving (Eq, Ord, Show)
+
+mkLeagueSelection :: AppInfo -> Form AppInfo e Name
+mkLeagueSelection = newForm [ radioField league [ (Premier, PremierField, "Premier League")
+                                                , (Champions, ChampionsField, "Champions League")
+                                                ]
+                            ]
+
+drawRows :: Columns -> [Fixture] -> Widget ()
 drawRows _ [] = emptyWidget
-drawRows columns xs = hCenter $ hBox (displaySizedGame <$> Prelude.take columns xs)
+drawRows columns xs = hCenter (hBox (displaySizedGame <$> Prelude.take columns xs))
   <=> drawRows columns (Prelude.drop columns xs)
 
-customWidget :: [Fixture] -> Widget ()
-customWidget xs =
+resizingGrid :: Width -> [Fixture] -> Widget ()
+resizingGrid width xs =
     Widget Fixed Fixed $ do
         ctx <- getContext
-        let thing = ctx ^. availWidthL `div` 60
+        let thing = ctx ^. availWidthL `div` width
         render $ drawRows thing xs
 
 displaySizedGame :: Fixture -> Widget ()
@@ -44,3 +58,10 @@ displayGame f =
 goalsNum :: Maybe Int -> String
 goalsNum (Just x) = show x
 goalsNum Nothing  = "-"
+
+main :: IO ()
+main = do
+  fixtures <- getFixtures
+  void $ case fixtures of
+      Just (Fixtures xs) -> simpleMain $ resizingGrid 60 xs
+      _                  -> return ()
