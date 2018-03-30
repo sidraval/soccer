@@ -29,3 +29,4 @@ executable soccer
                      , aeson
                      , HTTP
                      , bytestring
+                     , text

@@ -5,12 +5,14 @@
 module Main where
 
 import           Brick
+import           Brick.Focus
 import           Brick.Forms
 import           Brick.Widgets.Border
 import           Brick.Widgets.Border.Style
 import           Brick.Widgets.Center
 import           Control.Monad
 import           Fixture
+import qualified Graphics.Vty as V
 import           Lens.Micro
 import           Lens.Micro.TH
 
@@ -18,7 +20,7 @@ type Columns = Int
 type Width = Int
 
 data League = Premier | Champions deriving (Show, Eq)
-data AppInfo = FormState  { _league :: League } deriving (Show)
+data AppInfo = AppInfo  { _league :: League } deriving (Show)
 
 makeLenses ''AppInfo
 
@@ -59,9 +61,30 @@ goalsNum :: Maybe Int -> String
 goalsNum (Just x) = show x
 goalsNum Nothing  = "-"
 
+draw :: Form AppInfo e Name -> [Widget Name]
+draw f = [center $ renderForm f]
+
+app :: App (Form AppInfo e Name) e Name
+app =
+  App { appDraw = draw
+      , appHandleEvent = \s ev ->
+          case ev of
+            VtyEvent V.EvResize {} -> continue s
+            VtyEvent (V.EvKey V.KEsc []) -> halt s
+            _ -> do
+              s' <- handleFormEvent ev s
+              continue s'
+      , appChooseCursor = focusRingCursor formFocus
+      , appStartEvent = return
+      , appAttrMap = const $ attrMap V.defAttr []
+      }
+
 main :: IO ()
 main = do
-  fixtures <- getFixtures
-  void $ case fixtures of
-      Just (Fixtures xs) -> simpleMain $ renderForm $ mkLeagueSelection FormState { _league = Premier }
-      _                  -> return ()
+  let buildVty = do
+        v <- V.mkVty =<< V.standardIOConfig
+        V.setMode (V.outputIface v) V.Mouse True
+        return v
+      initialAppInfo = AppInfo { _league = Premier }
+      form = mkLeagueSelection initialAppInfo
+  void $ customMain buildVty Nothing app form
