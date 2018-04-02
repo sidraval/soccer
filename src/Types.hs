@@ -2,13 +2,22 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Fixture where
+module Types where
 
 import           Data.Aeson
 import           Data.ByteString.Lazy.Char8 as LBS
 import           Data.String
 import           GHC.Generics
 import           Network.HTTP
+
+type Columns = Int
+type Width = Int
+
+data League = Premier | Champions deriving (Show, Eq)
+
+leagueSymbol :: League -> String
+leagueSymbol Premier = "PL"
+leagueSymbol Champions = "CL"
 
 newtype Fixtures =
   Fixtures [Fixture]
@@ -55,9 +64,9 @@ data FixtureResult = FixtureResult
 
 instance FromJSON FixtureResult
 
-getFixtures :: IO (Maybe Fixtures)
-getFixtures = do
-  let url = "http://www.football-data.org/v1/fixtures?league=EL1&timeFrame=p4"
+getFixtures :: League -> IO (Maybe Fixtures)
+getFixtures l = do
+  let url = "http://www.football-data.org/v1/fixtures?league=" ++ leagueSymbol l ++ "&timeFrame=p3"
   resp <- simpleHTTP $ getRequest url
   responseBody <- getResponseBody resp
   return . decode $ LBS.pack responseBody

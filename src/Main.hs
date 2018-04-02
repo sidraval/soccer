@@ -12,15 +12,11 @@ import           Brick.Widgets.Border.Style
 import           Brick.Widgets.Center
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Fixture
-import qualified Graphics.Vty as V
+import qualified Graphics.Vty               as V
 import           Lens.Micro
 import           Lens.Micro.TH
+import           Types
 
-type Columns = Int
-type Width = Int
-
-data League = Premier | Champions deriving (Show, Eq)
 data AppInfo = AppInfo  { _league :: League, _fixtures :: Maybe Fixtures } deriving (Show)
 
 makeLenses ''AppInfo
@@ -64,8 +60,8 @@ goalsNum Nothing  = "-"
 
 draw :: Form AppInfo e Name -> [Widget Name]
 draw f = case formState f of
-  AppInfo { _league = Champions, _fixtures = Just (Fixtures xs) } -> [resizingGrid 60 xs]
-  _ -> [renderForm f]
+  AppInfo { _fixtures = Just (Fixtures xs) } -> [resizingGrid 60 xs]
+  _                                          -> [center $ renderForm f]
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr [(focusedFormInputAttr, V.black `on` V.yellow)]
@@ -78,13 +74,10 @@ app =
             VtyEvent V.EvResize {} -> continue s
             VtyEvent (V.EvKey V.KEsc []) -> halt s
             VtyEvent (V.EvKey V.KEnter []) -> do
-              fxt <- liftIO getFixtures
-              s' <- handleFormEvent ev s
-              let s'' = formState s' & fixtures .~ fxt
-              continue (s' { formState = s'' })
-            _ -> do
-              s' <- handleFormEvent ev s
-              continue s'
+              fxt <- liftIO . getFixtures $ formState s ^. league
+              let s' = formState s & fixtures .~ fxt
+              continue (s { formState = s' })
+            _ -> continue =<< handleFormEvent ev s
       , appChooseCursor = focusRingCursor formFocus
       , appStartEvent = return
       , appAttrMap = const theMap
