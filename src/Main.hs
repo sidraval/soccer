@@ -17,7 +17,7 @@ import           Lens.Micro
 import           Lens.Micro.TH
 import           Types
 
-data AppInfo = AppInfo  { _league :: League, _fixtures :: Maybe Fixtures, _appInfoFilter :: String } deriving (Show)
+data AppInfo = AppInfo  { _league :: League, _fixtures :: [Fixture], _appInfoFilter :: String } deriving (Show)
 
 makeLenses ''AppInfo
 
@@ -60,8 +60,8 @@ goalsNum Nothing  = "-"
 
 draw :: Form AppInfo e Name -> [Widget Name]
 draw f = case formState f of
-  AppInfo { _fixtures = Just (Fixtures xs) } -> [resizingGrid 60 xs]
-  _                                          -> [center $ renderForm f]
+  AppInfo { _fixtures = y@(_:_) } -> [resizingGrid 60 y]
+  _                                -> [center $ renderForm f]
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr [(focusedFormInputAttr, V.black `on` V.yellow)]
@@ -75,8 +75,8 @@ app =
             VtyEvent (V.EvKey V.KEsc []) -> halt s
             VtyEvent (V.EvKey (V.KChar c) []) -> do
               let filterString = (formState s ^. appInfoFilter) ++ [ c ]
-              let filteredFixtures = (formState s ^. fixtures) >>= (\(Fixtures fxs) -> Just $ filterFixtures fxs filterString)
-              let s' = formState s & fixtures .~ (Fixtures <$> filteredFixtures)
+              let filteredFixtures = (formState s ^. fixtures) & (`filterFixtures` filterString)
+              let s' = formState s & fixtures .~ filteredFixtures
                                    & appInfoFilter .~ filterString
               continue (s { formState = s' })
             VtyEvent (V.EvKey V.KEnter []) -> do
@@ -95,6 +95,6 @@ main = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-      initialAppInfo = AppInfo { _league = Premier, _fixtures = Nothing, _appInfoFilter = "" }
+      initialAppInfo = AppInfo { _league = Premier, _fixtures = [], _appInfoFilter = "" }
       form = mkLeagueSelection initialAppInfo
   void $ customMain buildVty Nothing app form

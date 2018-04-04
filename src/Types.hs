@@ -66,15 +66,19 @@ data FixtureResult = FixtureResult
 
 instance FromJSON FixtureResult
 
-getFixtures :: League -> IO (Maybe Fixtures)
+getFixtures :: League -> IO [Fixture]
 getFixtures l = do
   let url = "http://www.football-data.org/v1/fixtures?league=" ++ leagueSymbol l ++ "&timeFrame=p3"
   resp <- simpleHTTP $ getRequest url
   responseBody <- getResponseBody resp
-  return . decode $ LBS.pack responseBody
+  let fixtures :: Maybe Fixtures = decode . LBS.pack $ responseBody
+  return $ case fixtures of
+    (Just (Fixtures xs)) -> xs
+    _                    -> []
 
 filterFixtures :: [Fixture] -> String -> [Fixture]
-filterFixtures xs f = Prelude.filter (\fixture -> (toLower <$> f) `isInfixOf` (toLower <$> name fixture)) xs
+filterFixtures xs f = Prelude.filter (\fixture -> lcaseString `isInfixOf` lcaseOther (name fixture)) xs
+  where lcaseString = toLower <$> f; lcaseOther = fmap toLower
 
 name :: Fixture -> String
 name f = homeTeamName f ++ " vs. " ++ awayTeamName f
