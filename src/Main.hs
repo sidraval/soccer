@@ -12,12 +12,12 @@ import           Brick.Widgets.Border.Style
 import           Brick.Widgets.Center
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Graphics.Vty               as V
+import qualified Graphics.Vty as V
 import           Lens.Micro
 import           Lens.Micro.TH
 import           Types
 
-data AppInfo = AppInfo  { _league :: League, _fixtures :: Maybe Fixtures } deriving (Show)
+data AppInfo = AppInfo  { _league :: League, _fixtures :: Maybe Fixtures, _appInfoFilter :: String } deriving (Show)
 
 makeLenses ''AppInfo
 
@@ -73,6 +73,12 @@ app =
           case ev of
             VtyEvent V.EvResize {} -> continue s
             VtyEvent (V.EvKey V.KEsc []) -> halt s
+            VtyEvent (V.EvKey (V.KChar c) []) -> do
+              let filterString = (formState s ^. appInfoFilter) ++ [ c ]
+              let filteredFixtures = (formState s ^. fixtures) >>= (\(Fixtures fxs) -> Just $ filterFixtures fxs filterString)
+              let s' = formState s & fixtures .~ (Fixtures <$> filteredFixtures)
+                                   & appInfoFilter .~ filterString
+              continue (s { formState = s' })
             VtyEvent (V.EvKey V.KEnter []) -> do
               fxt <- liftIO . getFixtures $ formState s ^. league
               let s' = formState s & fixtures .~ fxt
@@ -89,6 +95,6 @@ main = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-      initialAppInfo = AppInfo { _league = Premier, _fixtures = Nothing }
+      initialAppInfo = AppInfo { _league = Premier, _fixtures = Nothing, _appInfoFilter = "" }
       form = mkLeagueSelection initialAppInfo
   void $ customMain buildVty Nothing app form

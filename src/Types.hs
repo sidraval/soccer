@@ -6,6 +6,8 @@ module Types where
 
 import           Data.Aeson
 import           Data.ByteString.Lazy.Char8 as LBS
+import           Data.Char
+import           Data.List
 import           Data.String
 import           GHC.Generics
 import           Network.HTTP
@@ -16,7 +18,7 @@ type Width = Int
 data League = Premier | Champions deriving (Show, Eq)
 
 leagueSymbol :: League -> String
-leagueSymbol Premier = "PL"
+leagueSymbol Premier   = "PL"
 leagueSymbol Champions = "CL"
 
 newtype Fixtures =
@@ -70,3 +72,9 @@ getFixtures l = do
   resp <- simpleHTTP $ getRequest url
   responseBody <- getResponseBody resp
   return . decode $ LBS.pack responseBody
+
+filterFixtures :: [Fixture] -> String -> [Fixture]
+filterFixtures xs f = Prelude.filter (\fixture -> (toLower <$> f) `isInfixOf` (toLower <$> name fixture)) xs
+
+name :: Fixture -> String
+name f = homeTeamName f ++ " vs. " ++ awayTeamName f
