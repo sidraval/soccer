@@ -12,7 +12,7 @@ import           Brick.Widgets.Border.Style
 import           Brick.Widgets.Center
 import           Control.Monad
 import           Control.Monad.IO.Class
-import qualified Graphics.Vty               as V
+import qualified Graphics.Vty as V
 import           Lens.Micro
 import           Lens.Micro.TH
 import           Types
@@ -73,16 +73,8 @@ app =
           case ev of
             VtyEvent V.EvResize {} -> continue s
             VtyEvent (V.EvKey V.KEsc []) -> halt s
-            VtyEvent (V.EvKey V.KBS []) -> do
-              let s' = formState s & filteredFixtures .~ (formState s ^. fixtures)
-                                   & appInfoFilter .~ ""
-              continue (s { formState = s' })
-            VtyEvent (V.EvKey (V.KChar c) []) | c /= ' ' -> do
-              let filterString = (formState s ^. appInfoFilter) ++ [ c ]
-              let ff = (formState s ^. fixtures) & (`filterFixtures` filterString)
-              let s' = formState s & filteredFixtures .~ ff
-                                  & appInfoFilter .~ filterString
-              continue (s { formState = s' })
+            VtyEvent (V.EvKey V.KBS []) -> continue $ removeFilter s
+            VtyEvent (V.EvKey (V.KChar c) []) | c /= ' ' -> continue $ filteredFormState c s
             VtyEvent (V.EvKey V.KEnter []) -> do
               fxt <- liftIO . getFixtures $ formState s ^. league
               let s' = formState s & fixtures .~ fxt & filteredFixtures .~ fxt
@@ -93,6 +85,17 @@ app =
       , appAttrMap = const theMap
       }
 
+removeFilter :: Form AppInfo e Name -> Form AppInfo e Name
+removeFilter s = s { formState = s' }
+  where s' = formState s & filteredFixtures .~ (formState s ^. fixtures)
+                         & appInfoFilter .~ ""
+
+filteredFormState :: Char -> Form AppInfo e Name -> Form AppInfo e Name
+filteredFormState c s = s { formState = s' }
+  where filterString = (formState s ^. appInfoFilter) ++ [ c ]
+        ff = (formState s ^. fixtures) & (`filterFixtures` filterString)
+        s' = formState s & filteredFixtures .~ ff
+                         & appInfoFilter .~ filterString
 main :: IO ()
 main = do
   let buildVty = do
