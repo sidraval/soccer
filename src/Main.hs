@@ -17,7 +17,10 @@ import           Lens.Micro
 import           Lens.Micro.TH
 import           Types
 
-data AppInfo = AppInfo  { _league :: League, _fixtures :: [Fixture], _appInfoFilter :: String, _filteredFixtures :: [Fixture] } deriving (Show)
+data AppInfo = AppInfo  { _league           :: League
+                        , _fixtures         :: [Fixture]
+                        , _appInfoFilter    :: String
+                        , _filteredFixtures :: [Fixture] } deriving (Show)
 
 makeLenses ''AppInfo
 
@@ -75,15 +78,18 @@ app =
             VtyEvent (V.EvKey V.KEsc []) -> halt s
             VtyEvent (V.EvKey V.KBS []) -> continue $ removeFilter s
             VtyEvent (V.EvKey (V.KChar c) []) | c /= ' ' -> continue $ filteredFormState c s
-            VtyEvent (V.EvKey V.KEnter []) -> do
-              fxt <- liftIO . getFixtures $ formState s ^. league
-              let s' = formState s & fixtures .~ fxt & filteredFixtures .~ fxt
-              continue (s { formState = s' })
+            VtyEvent (V.EvKey V.KEnter []) -> fetchAndDisplayFixtures s
             _ -> continue =<< handleFormEvent ev s
       , appChooseCursor = focusRingCursor formFocus
       , appStartEvent = return
       , appAttrMap = const theMap
       }
+
+fetchAndDisplayFixtures :: Form AppInfo e Name -> EventM Name (Next (Form AppInfo e Name))
+fetchAndDisplayFixtures s = do
+  fxt <- liftIO . getFixtures $ formState s ^. league
+  let s' = formState s & fixtures .~ fxt & filteredFixtures .~ fxt
+  continue (s { formState = s' })
 
 removeFilter :: Form AppInfo e Name -> Form AppInfo e Name
 removeFilter s = s { formState = s' }

@@ -68,7 +68,7 @@ instance FromJSON FixtureResult
 
 getFixtures :: League -> IO [Fixture]
 getFixtures l = do
-  let url = "http://www.football-data.org/v1/fixtures?league=" ++ leagueSymbol l ++ "&timeFrame=p3"
+  let url = "http://www.football-data.org/v1/fixtures?league=" ++ leagueSymbol l
   resp <- simpleHTTP $ getRequest url
   responseBody <- getResponseBody resp
   let fixtures :: Maybe Fixtures = decode . LBS.pack $ responseBody
