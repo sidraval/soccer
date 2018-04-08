@@ -20,7 +20,10 @@ import           Types
 data AppInfo = AppInfo  { _league           :: League
                         , _fixtures         :: [Fixture]
                         , _appInfoFilter    :: String
-                        , _filteredFixtures :: [Fixture] } deriving (Show)
+                        , _filteredFixtures :: [Fixture]
+                        , _currentScreen    :: Screen } deriving (Show)
+
+data Screen = Menu | Fixtures deriving (Show)
 
 makeLenses ''AppInfo
 
@@ -36,8 +39,8 @@ mkLeagueSelection = newForm [ radioField league [ (Premier, PremierField, "Premi
 
 drawRows :: Columns -> [Fixture] -> Widget Name
 drawRows _ [] = emptyWidget
-drawRows columns xs = hCenter (hBox (displaySizedGame <$> Prelude.take columns xs))
-  <=> drawRows columns (Prelude.drop columns xs)
+drawRows columns xs = hCenter (hBox (displaySizedGame <$> take columns xs))
+  <=> drawRows columns (drop columns xs)
 
 resizingGrid :: Width -> [Fixture] -> Widget Name
 resizingGrid width xs =
@@ -63,8 +66,11 @@ goalsNum Nothing  = "-"
 
 draw :: Form AppInfo e Name -> [Widget Name]
 draw f = case formState f of
-  AppInfo { _filteredFixtures = y@(_:_), _appInfoFilter = fs } -> [str fs <=> resizingGrid 60 y]
-  AppInfo { _appInfoFilter = fs }                                -> [str fs <=> center (renderForm f)]
+  AppInfo { _currentScreen = Main.Fixtures
+          , _filteredFixtures = y
+          , _appInfoFilter = fs } -> [str fs <=> resizingGrid 60 y]
+  AppInfo { _currentScreen = Menu
+          , _appInfoFilter = fs } -> [str fs <=> center (renderForm f)]
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr [(focusedFormInputAttr, V.black `on` V.yellow)]
@@ -88,7 +94,9 @@ app =
 fetchAndDisplayFixtures :: Form AppInfo e Name -> EventM Name (Next (Form AppInfo e Name))
 fetchAndDisplayFixtures s = do
   fxt <- liftIO . getFixtures $ formState s ^. league
-  let s' = formState s & fixtures .~ fxt & filteredFixtures .~ fxt
+  let s' = formState s & fixtures .~ fxt
+                       & filteredFixtures .~ fxt
+                       & currentScreen .~ Main.Fixtures
   continue (s { formState = s' })
 
 removeFilter :: Form AppInfo e Name -> Form AppInfo e Name
@@ -108,6 +116,10 @@ main = do
         v <- V.mkVty =<< V.standardIOConfig
         V.setMode (V.outputIface v) V.Mouse True
         return v
-      initialAppInfo = AppInfo { _league = Premier, _fixtures = [], _appInfoFilter = "", _filteredFixtures = [] }
+      initialAppInfo = AppInfo { _league = Premier
+                               , _fixtures = []
+                               , _appInfoFilter = ""
+                               , _filteredFixtures = []
+                               , _currentScreen = Menu }
       form = mkLeagueSelection initialAppInfo
   void $ customMain buildVty Nothing app form
