@@ -37,22 +37,22 @@ mkLeagueSelection = newForm [ radioField league [ (Premier, PremierField, "Premi
                                                 ]
                             ]
 
-drawRows :: Columns -> [Fixture] -> Widget Name
+drawRows :: Columns -> [Fixture] -> Widget n
 drawRows _ [] = emptyWidget
 drawRows columns xs = hCenter (hBox (displaySizedGame <$> take columns xs))
   <=> drawRows columns (drop columns xs)
 
-resizingGrid :: Width -> [Fixture] -> Widget Name
+resizingGrid :: Width -> [Fixture] -> Widget n
 resizingGrid width xs =
     Widget Fixed Fixed $ do
         ctx <- getContext
         let thing = ctx ^. availWidthL `div` width
         render $ drawRows thing xs
 
-displaySizedGame :: Fixture -> Widget Name
+displaySizedGame :: Fixture -> Widget n
 displaySizedGame f = padBottom (Pad 2) $ padRight (Pad 5) $ setAvailableSize (55, 5) $ displayGame f
 
-displayGame :: Fixture -> Widget Name
+displayGame :: Fixture -> Widget n
 displayGame f =
   withBorderStyle unicode $
   borderWithLabel
@@ -64,47 +64,52 @@ goalsNum :: Maybe Int -> String
 goalsNum (Just x) = show x
 goalsNum Nothing  = "-"
 
-draw :: Form AppInfo e Name -> [Widget Name]
+draw :: (Eq n) => Form AppInfo e n -> Widget n
 draw f = case formState f of
-  AppInfo { _currentScreen = Main.Fixtures
-          , _filteredFixtures = y
-          , _appInfoFilter = fs } -> [str fs <=> resizingGrid 60 y]
-  AppInfo { _currentScreen = Menu
-          , _appInfoFilter = fs } -> [str fs <=> center (renderForm f)]
+  a@AppInfo { _currentScreen = Main.Fixtures } -> drawFixtures a
+  AppInfo { _currentScreen = Menu }            -> center $ renderForm f
+
+drawFixtures :: AppInfo -> Widget n
+drawFixtures a = str (a ^. appInfoFilter) <=> resizingGrid 60 (a ^. filteredFixtures)
 
 theMap :: AttrMap
 theMap = attrMap V.defAttr [(focusedFormInputAttr, V.black `on` V.yellow)]
 
-app :: App (Form AppInfo e Name) e Name
+app :: (Eq n) => App (Form AppInfo e n) e n
 app =
-  App { appDraw = draw
+  App { appDraw = return . draw
       , appHandleEvent = \s ev ->
           case ev of
             VtyEvent V.EvResize {} -> continue s
             VtyEvent (V.EvKey V.KEsc []) -> halt s
-            VtyEvent (V.EvKey V.KBS []) -> continue $ removeFilter s
-            VtyEvent (V.EvKey (V.KChar c) []) | c /= ' ' -> continue $ filteredFormState c s
-            VtyEvent (V.EvKey V.KEnter []) -> fetchAndDisplayFixtures s
+            VtyEvent (V.EvKey V.KBS []) -> route Main.Fixtures $ removeFilter s
+            VtyEvent (V.EvKey (V.KChar c) []) | c /= ' ' -> route Main.Fixtures $ filteredFormState c s
+            VtyEvent (V.EvKey V.KEnter []) -> route Main.Fixtures =<< liftIO (fetchAndDisplayFixtures s)
             _ -> continue =<< handleFormEvent ev s
       , appChooseCursor = focusRingCursor formFocus
       , appStartEvent = return
       , appAttrMap = const theMap
       }
 
-fetchAndDisplayFixtures :: Form AppInfo e Name -> EventM Name (Next (Form AppInfo e Name))
+route :: Screen -> Form AppInfo e n -> EventM n (Next (Form AppInfo e n))
+route s f = do
+  let s' = formState f & currentScreen .~ s
+  continue $ f { formState = s' }
+
+
+fetchAndDisplayFixtures :: Form AppInfo e n -> IO (Form AppInfo e n)
 fetchAndDisplayFixtures s = do
-  fxt <- liftIO . getFixtures $ formState s ^. league
+  fxt <- getFixtures $ formState s ^. league
   let s' = formState s & fixtures .~ fxt
                        & filteredFixtures .~ fxt
-                       & currentScreen .~ Main.Fixtures
-  continue (s { formState = s' })
+  return (s { formState = s' })
 
-removeFilter :: Form AppInfo e Name -> Form AppInfo e Name
+removeFilter :: Form AppInfo e n -> Form AppInfo e n
 removeFilter s = s { formState = s' }
   where s' = formState s & filteredFixtures .~ (formState s ^. fixtures)
                          & appInfoFilter .~ ""
 
-filteredFormState :: Char -> Form AppInfo e Name -> Form AppInfo e Name
+filteredFormState :: Char -> Form AppInfo e n -> Form AppInfo e n
 filteredFormState c s = s { formState = s' }
   where filterString = (formState s ^. appInfoFilter) ++ [ c ]
         ff = (formState s ^. fixtures) & (`filterFixtures` filterString)
